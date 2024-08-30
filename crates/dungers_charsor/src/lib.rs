@@ -2,13 +2,13 @@ use core::ops::Range;
 
 /// enhanced version of [std::str::Chars].
 #[derive(Debug, Clone)]
-pub struct CharCursor<'a> {
+pub struct Charsor<'a> {
     input: &'a str,
     /// byte position relative to the beginning of the input.
     offset: usize,
 }
 
-impl<'a> CharCursor<'a> {
+impl<'a> Charsor<'a> {
     pub fn new(input: &'a str) -> Self {
         Self { input, offset: 0 }
     }
@@ -90,14 +90,14 @@ mod tests {
 
     #[test]
     fn test_peek() {
-        let mut cc = CharCursor::new(INPUT);
+        let mut cc = Charsor::new(INPUT);
         assert_eq!(cc.peek(), Some(INPUT_CHARS[0]));
         assert_eq!(cc.next(), Some(INPUT_CHARS[0]));
     }
 
     #[test]
     fn test_next() {
-        let mut cc = CharCursor::new(INPUT);
+        let mut cc = Charsor::new(INPUT);
         for ch in INPUT_CHARS.iter().cloned() {
             assert_eq!(cc.next(), Some(ch));
         }
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_prev() {
-        let mut cc = CharCursor::new(INPUT);
+        let mut cc = Charsor::new(INPUT);
         assert_eq!(cc.prev(), None);
         assert_eq!(cc.next(), Some(INPUT_CHARS[0]));
         assert_eq!(cc.prev(), Some(INPUT_CHARS[0]));
@@ -118,14 +118,14 @@ mod tests {
 
         let input = format!("{PREFIX}{INPUT}");
 
-        let mut cc = CharCursor::new(&input);
+        let mut cc = Charsor::new(&input);
         cc.eat_while(|ch| ch.is_whitespace());
         assert_eq!(cc.offset(), PREFIX.len());
     }
 
     #[test]
     fn test_offset() {
-        let mut cc = CharCursor::new(INPUT);
+        let mut cc = Charsor::new(INPUT);
         let _ = cc.next();
         assert_eq!(cc.offset(), INPUT_CHARS[0].len_utf8());
         let _ = cc.next();
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_prev_offset() {
-        let mut cc = CharCursor::new(INPUT);
+        let mut cc = Charsor::new(INPUT);
         assert_eq!(cc.prev_offset(), 0);
         let _ = cc.next();
         assert_eq!(cc.prev_offset(), 0);
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_slice_range() {
-        let cc = CharCursor::new(INPUT);
+        let cc = Charsor::new(INPUT);
         let range = Range {
             start: 0,
             end: INPUT_CHARS[0].len_utf8(),
