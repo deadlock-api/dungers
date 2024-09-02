@@ -112,11 +112,10 @@ pub fn read_uvarint64<R: io::Read>(rdr: &mut R) -> Result<(u64, usize)> {
     for count in 1..max_varint_size::<u64>() {
         rdr.read_exact(&mut buf)?;
         let byte = unsafe { *buf.get_unchecked(0) };
-        if (byte & CONTINUE_BIT) == 0 {
-            value |= (byte as u64) << (count * 7);
-            return Ok((value, count));
-        }
         value |= ((byte & PAYLOAD_BITS) as u64) << (count * 7);
+        if (byte & CONTINUE_BIT) == 0 {
+            return Ok((value, count + 1));
+        }
     }
 
     Err(Error::MalformedVarint)
