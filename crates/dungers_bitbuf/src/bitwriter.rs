@@ -1,4 +1,7 @@
-use crate::{zigzag_encode32, zigzag_encode64, Error, Result, BIT_WRITE_MASKS, EXTRA_MASKS};
+#[cfg(feature = "varint")]
+use dungers_varint::{zigzag_encode64, CONTINUE_BIT, PAYLOAD_BITS};
+
+use crate::{Error, Result, BIT_WRITE_MASKS, EXTRA_MASKS};
 
 pub struct BitWriter<'a> {
     data_bits: usize,
@@ -7,6 +10,7 @@ pub struct BitWriter<'a> {
 }
 
 impl<'a> BitWriter<'a> {
+    #[inline]
     pub fn new(buf: &'a mut [u8]) -> Self {
         // make sure that alignment is correct.
         debug_assert!(buf.len() % 8 == 0);
@@ -22,22 +26,22 @@ impl<'a> BitWriter<'a> {
     }
 
     #[inline(always)]
-    pub fn get_num_bits_left(&self) -> usize {
+    pub fn num_bits_left(&self) -> usize {
         self.data_bits - self.cur_bit
     }
 
     #[inline(always)]
-    pub fn get_num_bytes_left(&self) -> usize {
-        self.get_num_bits_left() >> 3
+    pub fn num_bytes_left(&self) -> usize {
+        self.num_bits_left() >> 3
     }
 
     #[inline(always)]
-    pub fn get_num_bits_written(&self) -> usize {
+    pub fn num_bits_written(&self) -> usize {
         self.cur_bit
     }
 
     #[inline(always)]
-    pub fn get_num_bytes_written(&self) -> usize {
+    pub fn num_bytes_written(&self) -> usize {
         (self.cur_bit + 7) >> 3
     }
 
@@ -80,7 +84,7 @@ impl<'a> BitWriter<'a> {
         let mut block1 = unsafe { *self.data.get_unchecked(block1_idx) };
         block1 &= BIT_WRITE_MASKS[bit_offset][n];
         block1 |= data << bit_offset;
-        *unsafe { self.data.get_unchecked_mut(block1_idx) } = block1;
+        unsafe { *self.data.get_unchecked_mut(block1_idx) = block1 };
 
         // did it span a block?
         let bits_written = 64 - bit_offset;
@@ -93,7 +97,7 @@ impl<'a> BitWriter<'a> {
             let mut block2 = unsafe { *self.data.get_unchecked(block2_idx) };
             block2 &= BIT_WRITE_MASKS[0][n];
             block2 |= data;
-            *unsafe { self.data.get_unchecked_mut(block2_idx) } = block2;
+            unsafe { *self.data.get_unchecked_mut(block2_idx) = block2 };
         }
 
         self.cur_bit += n;
@@ -101,53 +105,32 @@ impl<'a> BitWriter<'a> {
         Ok(())
     }
 
-    // void bf_write::WriteByte( unsigned int val )
-    pub fn write_u8(&mut self, data: u8) -> Result<()> {
+    pub fn write_byte(&mut self, data: u8) -> Result<()> {
         self.write_ubit64(data as u64, 8)
     }
 
     // NOTE: ref impl for varints:
     // https://github.com/rust-lang/rust/blob/e5b3e68abf170556b9d56c6f9028318e53c9f06b/compiler/rustc_serialize/src/leb128.rs
 
-    // TODO: this can be faster
-    //
-    // void bf_write::WriteVarInt64( uint64 data )
-    pub fn write_uvarint64(&mut self, data: u64) -> Result<()> {
-        let mut data = data;
+    // TODO: varint funcs can be faster
+
+    #[cfg(feature = "varint")]
+    pub fn write_uvarint64(&mut self, mut value: u64) -> Result<()> {
         loop {
-            if data < 0x80 {
-                self.write_u8(data as u8)?;
+            if value < CONTINUE_BIT as u64 {
+                self.write_byte(value as u8)?;
                 break;
             }
-            self.write_u8(((data & 0x7f) | 0x80) as u8)?;
-            data >>= 7;
+
+            self.write_byte(((value & PAYLOAD_BITS as u64) | CONTINUE_BIT as u64) as u8)?;
+            value >>= 7;
         }
+
         Ok(())
     }
 
-    // TODO: this can be faster
-    //
-    // void bf_write::WriteVarInt32( uint32 data )
-    pub fn write_uvarint32(&mut self, data: u32) -> Result<()> {
-        let mut data = data;
-        loop {
-            if data < 0x80 {
-                self.write_u8(data as u8)?;
-                break;
-            }
-            self.write_u8(((data & 0x7f) | 0x80) as u8)?;
-            data >>= 7;
-        }
-        Ok(())
-    }
-
-    // void bf_write::WriteSignedVarInt64( int64 data )
+    #[cfg(feature = "varint")]
     pub fn write_varint64(&mut self, data: i64) -> Result<()> {
         self.write_uvarint64(zigzag_encode64(data))
-    }
-
-    // void bf_write::WriteSignedVarInt32( int32 data )
-    pub fn write_varint32(&mut self, data: i32) -> Result<()> {
-        self.write_uvarint32(zigzag_encode32(data))
     }
 }

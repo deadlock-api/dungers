@@ -1,4 +1,7 @@
-use crate::{zigzag_decode32, zigzag_decode64, Error, Result, EXTRA_MASKS};
+#[cfg(feature = "varint")]
+use dungers_varint::{max_varint_size, zigzag_decode64, CONTINUE_BIT, PAYLOAD_BITS};
+
+use crate::{Error, Result, EXTRA_MASKS};
 
 pub struct BitReader<'a> {
     data_bits: usize,
@@ -7,6 +10,7 @@ pub struct BitReader<'a> {
 }
 
 impl<'a> BitReader<'a> {
+    #[inline]
     pub fn new(data: &'a [u8]) -> Self {
         // make sure that alignment is correct.
         debug_assert!(data.len() % 8 == 0);
@@ -22,22 +26,22 @@ impl<'a> BitReader<'a> {
     }
 
     #[inline(always)]
-    pub fn get_num_bits_left(&self) -> usize {
+    pub fn num_bits_left(&self) -> usize {
         self.data_bits - self.cur_bit
     }
 
     #[inline(always)]
-    pub fn get_num_bytes_left(&self) -> usize {
-        self.get_num_bits_left() >> 3
+    pub fn num_bytes_left(&self) -> usize {
+        self.num_bits_left() >> 3
     }
 
     #[inline(always)]
-    pub fn get_num_bits_read(&self) -> usize {
+    pub fn num_bits_read(&self) -> usize {
         self.cur_bit
     }
 
     #[inline(always)]
-    pub fn get_num_bytes_read(&self) -> usize {
+    pub fn num_bytes_read(&self) -> usize {
         (self.cur_bit + 7) >> 3
     }
 
@@ -60,16 +64,15 @@ impl<'a> BitReader<'a> {
         Ok(self.cur_bit)
     }
 
-    #[inline]
-    pub fn read_ubit64(&mut self, num_bits: usize) -> Result<u64> {
+    #[inline(always)]
+    pub unsafe fn read_ubit64_unchecked(&mut self, num_bits: usize) -> u64 {
         // make sure that the requested number of bits to read is in bounds of u64.
         debug_assert!(num_bits <= 64);
+        // make sure that there's enough bits left
+        debug_assert!(self.num_bits_left() >= self.num_bits_left());
 
-        if self.get_num_bits_left() < num_bits {
-            return Err(Error::Overflow);
-        }
-
-        // SAFETY: assert and check above ensure that we'll not go out of bounds.
+        // SAFETY: asserts above ensure that we'll not go out of bounds; but they will be gone in
+        // release builds.
 
         let block1_idx = self.cur_bit >> 6;
 
@@ -94,78 +97,114 @@ impl<'a> BitReader<'a> {
             ret |= block2 << (num_bits - extra_bits);
         }
 
-        Ok(ret)
+        ret
     }
 
-    // int old_bf_read::ReadByte()
-    pub fn read_u8(&mut self) -> Result<u8> {
+    /// read_ubit64 reads the specified number of bits into a `u64`. the function can read up to a
+    /// maximum of 64 bits at a time. if the `num_bits` exceeds the number of remaining bits, the
+    /// function returns an [`Error::Overflow`] error.
+    #[inline]
+    pub fn read_ubit64(&mut self, num_bits: usize) -> Result<u64> {
+        // make sure that the requested number of bits to read is in bounds of u64.
+        debug_assert!(num_bits <= 64);
+
+        if self.num_bits_left() < num_bits {
+            return Err(Error::Overflow);
+        }
+
+        // SAFETY: assert and check above ensure that we'll not go out of bounds.
+        unsafe { Ok(self.read_ubit64_unchecked(num_bits)) }
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_bool_unchecked(&mut self) -> bool {
+        // ensure that there's at least one bit left
+        debug_assert!(self.num_bits_left() >= 1);
+
+        // SAFETY: assert above ensures that we'll not go out of bounds; but it will be gone in
+        // release builds.
+
+        let one_bit =
+            unsafe { self.data.get_unchecked(self.cur_bit >> 6) } >> (self.cur_bit & 63) & 1;
+        self.cur_bit += 1;
+
+        one_bit == 1
+    }
+
+    #[inline]
+    pub fn read_bool(&mut self) -> Result<bool> {
+        if self.num_bits_left() < 1 {
+            return Err(Error::Overflow);
+        }
+
+        // SAFETY: check above ensures that we'll not go out of bounds.
+        unsafe { Ok(self.read_bool_unchecked()) }
+    }
+
+    #[inline(always)]
+    pub unsafe fn read_byte_unchecked(&mut self) -> u8 {
+        // NOTE: there's no point to assert anything here because read_bits_unchecked contains all
+        // the necessary debug assertions.
+        self.read_ubit64_unchecked(8) as u8
+    }
+
+    #[inline]
+    pub fn read_byte(&mut self) -> Result<u8> {
         self.read_ubit64(8).map(|result| result as u8)
     }
 
     // NOTE: ref impl for varints:
     // https://github.com/rust-lang/rust/blob/e5b3e68abf170556b9d56c6f9028318e53c9f06b/compiler/rustc_serialize/src/leb128.rs
 
-    // TODO: this can be faster
-    //
-    // uint64 old_bf_read::ReadVarInt64()
+    // TODO: varint funcs can be faster
+
+    #[cfg(feature = "varint")]
+    pub unsafe fn read_uvarint64_unchecked(&mut self) -> u64 {
+        let byte = self.read_byte_unchecked();
+        if (byte & CONTINUE_BIT) == 0 {
+            return byte as u64;
+        }
+
+        let mut value = (byte & 0x7f) as u64;
+        for count in 1..=max_varint_size::<u64>() {
+            let byte = self.read_byte_unchecked();
+            if (byte & CONTINUE_BIT) == 0 {
+                value |= (byte as u64) << (count * 7);
+                return value;
+            }
+            value |= ((byte & PAYLOAD_BITS) as u64) << (count * 7);
+        }
+
+        panic!("{}", Error::MalformedVarint)
+    }
+
+    #[cfg(feature = "varint")]
     pub fn read_uvarint64(&mut self) -> Result<u64> {
-        let byte = self.read_u8()?;
-        if (byte & 0x80) == 0 {
+        let byte = self.read_byte()?;
+        if (byte & CONTINUE_BIT) == 0 {
             return Ok(byte as u64);
         }
-        let mut result = (byte & 0x7f) as u64;
-        for count in 1..=10 {
-            let byte = self.read_u8()?;
-            if (byte & 0x80) == 0 {
-                result |= (byte as u64) << (count * 7);
-                return Ok(result);
+
+        let mut value = (byte & 0x7f) as u64;
+        for count in 1..=max_varint_size::<u64>() {
+            let byte = self.read_byte()?;
+            if (byte & CONTINUE_BIT) == 0 {
+                value |= (byte as u64) << (count * 7);
+                return Ok(value);
             }
-            result |= ((byte & 0x7f) as u64) << (count * 7);
+            value |= ((byte & PAYLOAD_BITS) as u64) << (count * 7);
         }
+
         Err(Error::MalformedVarint)
     }
 
-    // TODO: this can be faster
-    //
-    // uint32 old_bf_read::ReadVarInt32()
-    pub fn read_uvarint32(&mut self) -> Result<u32> {
-        let byte = self.read_u8()?;
-        if (byte & 0x80) == 0 {
-            return Ok(byte as u32);
-        }
-        let mut result = (byte & 0x7f) as u32;
-        for count in 1..=5 {
-            let byte = self.read_u8()?;
-            if (byte & 0x80) == 0 {
-                result |= (byte as u32) << (count * 7);
-                return Ok(result);
-            }
-            result |= ((byte & 0x7f) as u32) << (count * 7);
-        }
-        Err(Error::MalformedVarint)
+    #[cfg(feature = "varint")]
+    pub unsafe fn read_varint64_unchecked(&mut self) -> i64 {
+        zigzag_decode64(self.read_uvarint64_unchecked())
     }
 
-    // int32 ReadSignedVarInt32()
+    #[cfg(feature = "varint")]
     pub fn read_varint64(&mut self) -> Result<i64> {
         self.read_uvarint64().map(zigzag_decode64)
-    }
-
-    // int64 ReadSignedVarInt64()
-    pub fn read_varint32(&mut self) -> Result<i32> {
-        self.read_uvarint32().map(zigzag_decode32)
-    }
-
-    #[inline(always)]
-    pub fn read_bool(&mut self) -> Result<bool> {
-        if self.get_num_bits_left() < 1 {
-            return Err(Error::Overflow);
-        }
-
-        // SAFETY: check above ensures that we'll not go out of bounds.
-        let one_bit =
-            unsafe { self.data.get_unchecked(self.cur_bit >> 6) } >> (self.cur_bit & 63) & 1;
-        self.cur_bit += 1;
-
-        Ok(one_bit == 1)
     }
 }

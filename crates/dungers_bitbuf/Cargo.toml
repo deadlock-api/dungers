@@ -4,12 +4,25 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
+dungers_varint = { workspace = true, optional = true }
 thiserror.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
 criterion-cycles-per-byte.workspace = true
 
+[features]
+varint = ["dep:dungers_varint"]
+
+[[test]]
+name = "varint"
+required-features = ["varint"]
+
 [[bench]]
 name = "ubit64"
 harness = false
+
+[[bench]]
+name = "varint"
+harness = false
+required-features = ["varint"]

@@ -1,39 +1,33 @@
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{BenchmarkId, Criterion};
 use criterion_cycles_per_byte::CyclesPerByte;
 use dungers_bitbuf::{BitReader, BitWriter};
 
+const U64_INPUTS: &[&(u64, usize)] = &[&(0xdeadbeefcafebabe, 64), &(0xdeadbeef, 32), &(0xaa, 8)];
+
 fn bench_write_ubit64(c: &mut Criterion<CyclesPerByte>) {
-    let mut group = c.benchmark_group("write_ubit64");
-    let mut buf = [0u8; 1024];
+    let mut group = c.benchmark_group("bitbuf/ubit64");
 
-    group.bench_function("write 64 bits", |b| {
+    let mut buf = [0u8; 100];
+
+    for &input in U64_INPUTS {
+        group.bench_function(
+            BenchmarkId::new("write_ubit64", format!("{:?}", input)),
+            |b| {
+                b.iter(|| {
+                    let mut w = BitWriter::new(&mut buf);
+                    black_box(w.write_ubit64(input.0, input.1).unwrap());
+                })
+            },
+        );
+    }
+
+    group.bench_function("write_ubit64", |b| {
         b.iter(|| {
             let mut w = BitWriter::new(&mut buf);
-            w.write_ubit64(black_box(0xdeadbeefcafebabe), 64).unwrap();
-        })
-    });
-
-    group.bench_function("write 32 bits", |b| {
-        b.iter(|| {
-            let mut w = BitWriter::new(&mut buf);
-            w.write_ubit64(black_box(0xdeadbeef), 32).unwrap();
-        })
-    });
-
-    group.bench_function("write 8 bits", |b| {
-        b.iter(|| {
-            let mut w = BitWriter::new(&mut buf);
-            w.write_ubit64(black_box(0xaa), 8).unwrap();
-        })
-    });
-
-    group.bench_function("spanning blocks", |b| {
-        b.iter(|| {
-            let mut w = BitWriter::new(&mut buf);
-            w.write_ubit64(black_box(0xfffffffffffffff), 60).unwrap();
-            w.write_ubit64(black_box(0xaa), 8).unwrap();
+            black_box(w.write_ubit64(0xfffffffffffffff, 60).unwrap());
+            black_box(w.write_ubit64(0xaa, 8).unwrap());
         })
     });
 
@@ -41,44 +35,61 @@ fn bench_write_ubit64(c: &mut Criterion<CyclesPerByte>) {
 }
 
 fn bench_read_ubit64(c: &mut Criterion<CyclesPerByte>) {
-    let mut group = c.benchmark_group("read_ubit64");
-    let mut buf = [0xFFu8; 1024];
+    let mut group = c.benchmark_group("bitbuf/ubit64");
 
-    group.bench_function("read 64 bits", |b| {
-        b.iter(|| {
-            let mut r = BitReader::new(&mut buf);
-            black_box(r.read_ubit64(64).unwrap());
+    let mut buf = [0xFFu8; 100];
+
+    for &input in U64_INPUTS {
+        group.bench_function(
+            BenchmarkId::new("read_ubit64_unchecked", format!("{:?}", input)),
+            |b| {
+                b.iter(|| unsafe {
+                    let mut r = BitReader::new(&mut buf);
+                    black_box(r.read_ubit64_unchecked(input.1));
+                })
+            },
+        );
+    }
+    for &input in U64_INPUTS {
+        group.bench_function(
+            BenchmarkId::new("read_ubit64", format!("{:?}", input)),
+            |b| {
+                b.iter(|| {
+                    let mut r = BitReader::new(&mut buf);
+                    black_box(r.read_ubit64(input.1).unwrap());
+                })
+            },
+        );
+    }
+
+    group.bench_function("read_ubit64_unchecked/<spanning_blocks>", |b| {
+        b.iter(|| unsafe {
+            let mut w = BitReader::new(&mut buf);
+            black_box(w.read_ubit64_unchecked(60));
+            black_box(w.read_ubit64_unchecked(8));
         })
     });
-
-    group.bench_function("read 32 bits", |b| {
+    group.bench_function("read_ubit64/<spanning_blocks>", |b| {
         b.iter(|| {
-            let mut r = BitReader::new(&mut buf);
-            black_box(r.read_ubit64(32).unwrap());
-        })
-    });
-
-    group.bench_function("read 8 bits", |b| {
-        b.iter(|| {
-            let mut r = BitReader::new(&mut buf);
-            black_box(r.read_ubit64(8).unwrap());
-        })
-    });
-
-    group.bench_function("spanning blocks", |b| {
-        b.iter(|| {
-            let mut r = BitReader::new(&mut buf);
-            black_box(r.read_ubit64(60).unwrap());
-            black_box(r.read_ubit64(8).unwrap());
+            let mut w = BitReader::new(&mut buf);
+            black_box(w.read_ubit64(60).unwrap());
+            black_box(w.read_ubit64(8).unwrap());
         })
     });
 
     group.finish();
 }
 
-criterion_group!(
-    name = benches;
-    config = Criterion::default().with_measurement(CyclesPerByte);
-    targets = bench_write_ubit64, bench_read_ubit64
-);
-criterion_main!(benches);
+fn main() {
+    let mut c = Criterion::default()
+        // NOTE: due to CyclesPerByte's requirements this benchmark should be started with certain
+        // flags:
+        // $ RUSTFLAGS="--cfg rdpru" taskset --cpu-list 0 cargo bench
+        .with_measurement(CyclesPerByte)
+        .configure_from_args();
+
+    bench_write_ubit64(&mut c);
+    bench_read_ubit64(&mut c);
+
+    c.final_summary();
+}
