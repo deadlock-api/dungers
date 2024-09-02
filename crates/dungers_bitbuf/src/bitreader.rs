@@ -149,6 +149,13 @@ impl<'a> BitReader<'a> {
         let mut out = buf.as_mut_ptr();
         let mut bits_left = num_bits;
 
+        // align to u64 boundary
+        while (out as usize & 7) != 0 && bits_left >= 8 {
+            *out = self.read_ubit64_unchecked(8) as u8;
+            out = out.add(1);
+            bits_left -= 8;
+        }
+
         // read large "blocks"/chunks first
         while bits_left >= 64 {
             *(out as *mut u64) = self.read_ubit64_unchecked(64);
