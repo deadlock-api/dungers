@@ -66,17 +66,12 @@ impl<'a> BitReader<'a> {
 
     #[inline(always)]
     pub unsafe fn read_ubit64_unchecked(&mut self, num_bits: usize) -> u64 {
-        // make sure that the requested number of bits to read is in bounds of u64.
         debug_assert!(num_bits <= 64);
-        // make sure that there's enough bits left
-        debug_assert!(self.num_bits_left() >= self.num_bits_left());
-
-        // SAFETY: asserts above ensure that we'll not go out of bounds; but they will be gone in
-        // release builds.
+        debug_assert!(self.num_bits_left() >= num_bits);
 
         let block1_idx = self.cur_bit >> 6;
 
-        let mut block1 = unsafe { *self.data.get_unchecked(block1_idx) };
+        let mut block1 = *self.data.get_unchecked(block1_idx);
         // get the bits we're interested in
         block1 >>= self.cur_bit & 63;
 
@@ -89,7 +84,7 @@ impl<'a> BitReader<'a> {
         } else {
             let extra_bits = self.cur_bit & 63;
 
-            let mut block2 = unsafe { *self.data.get_unchecked(block1_idx + 1) };
+            let mut block2 = *self.data.get_unchecked(block1_idx + 1);
             block2 &= EXTRA_MASKS[extra_bits];
 
             // no need to mask since we hit the end of the dword.
@@ -105,7 +100,9 @@ impl<'a> BitReader<'a> {
     /// function returns an [`Error::Overflow`] error.
     #[inline]
     pub fn read_ubit64(&mut self, num_bits: usize) -> Result<u64> {
-        // make sure that the requested number of bits to read is in bounds of u64.
+        // NOTE: this assertion is redundant because read_ubit64_unchecked that is called down
+        // below asserts the same thing, but it makes things tiny bit more straightforwar thus i'd
+        // like to keep it.
         debug_assert!(num_bits <= 64);
 
         if self.num_bits_left() < num_bits {
@@ -118,16 +115,10 @@ impl<'a> BitReader<'a> {
 
     #[inline(always)]
     pub unsafe fn read_bool_unchecked(&mut self) -> bool {
-        // ensure that there's at least one bit left
         debug_assert!(self.num_bits_left() >= 1);
 
-        // SAFETY: assert above ensures that we'll not go out of bounds; but it will be gone in
-        // release builds.
-
-        let one_bit =
-            unsafe { self.data.get_unchecked(self.cur_bit >> 6) } >> (self.cur_bit & 63) & 1;
+        let one_bit = self.data.get_unchecked(self.cur_bit >> 6) >> (self.cur_bit & 63) & 1;
         self.cur_bit += 1;
-
         one_bit == 1
     }
 
@@ -136,21 +127,63 @@ impl<'a> BitReader<'a> {
         if self.num_bits_left() < 1 {
             return Err(Error::Overflow);
         }
-
         // SAFETY: check above ensures that we'll not go out of bounds.
         unsafe { Ok(self.read_bool_unchecked()) }
     }
 
     #[inline(always)]
     pub unsafe fn read_byte_unchecked(&mut self) -> u8 {
-        // NOTE: there's no point to assert anything here because read_bits_unchecked contains all
-        // the necessary debug assertions.
+        // NOTE: there's no point in asserting anything here because read_ubit64_unchecked contains
+        // all the necessary debug assertions.
         self.read_ubit64_unchecked(8) as u8
     }
 
     #[inline]
     pub fn read_byte(&mut self) -> Result<u8> {
-        self.read_ubit64(8).map(|result| result as u8)
+        self.read_ubit64(8).map(|byte| byte as u8)
+    }
+
+    pub unsafe fn read_bits_unchecked(&mut self, buf: &mut [u8], num_bits: usize) {
+        debug_assert!(self.num_bits_left() >= num_bits);
+
+        let mut out = buf.as_mut_ptr();
+        let mut bits_left = num_bits;
+
+        // read large "blocks"/chunks first
+        while bits_left >= 64 {
+            *(out as *mut u64) = self.read_ubit64_unchecked(64);
+            out = out.add(8);
+            bits_left -= 64;
+        }
+
+        // read remaining bytes
+        while bits_left >= 8 {
+            *out = self.read_ubit64_unchecked(8) as u8;
+            out = out.add(1);
+            bits_left -= 8;
+        }
+
+        // read remaining bits
+        if bits_left > 0 {
+            *out = self.read_ubit64_unchecked(bits_left) as u8;
+        }
+    }
+
+    pub fn read_bits(&mut self, buf: &mut [u8], num_bits: usize) -> Result<()> {
+        if self.num_bits_left() < num_bits {
+            return Err(Error::Overflow);
+        }
+        // SAFETY: check above ensures that we'll not go out of bounds.
+        unsafe { self.read_bits_unchecked(buf, num_bits) };
+        Ok(())
+    }
+
+    pub unsafe fn read_bytes_unchecked(&mut self, buf: &mut [u8]) {
+        self.read_bits_unchecked(buf, buf.len() << 3);
+    }
+
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<()> {
+        self.read_bits(buf, buf.len() << 3)
     }
 
     // NOTE: ref impl for varints:

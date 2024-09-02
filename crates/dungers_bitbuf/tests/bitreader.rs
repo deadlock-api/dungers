@@ -33,3 +33,59 @@ fn test_read_ubit64_spanning_blocks() {
     // start of the second block
     assert_eq!(result, 0xaf);
 }
+
+#[test]
+fn test_read_bits() {
+    let buf = [
+        0b10110011, 0b01011100, 0b11001010, 0b00110101, 0xff, 0xff, 0xff, 0xff,
+    ];
+    let mut r = BitReader::new(&buf);
+
+    let mut out = [0u8; 4];
+
+    // read 3 bits
+    r.read_bits(&mut out[0..1], 3).unwrap();
+    assert_eq!(out[0], 0b011);
+
+    // read 5 bits
+    r.read_bits(&mut out[0..1], 5).unwrap();
+    assert_eq!(out[0], 0b10110);
+
+    // read 8 bits
+    r.read_bits(&mut out[0..1], 8).unwrap();
+    assert_eq!(out[0], 0b01011100);
+
+    // read 16 bits
+    r.read_bits(&mut out[0..2], 16).unwrap();
+    assert_eq!(out[0], 0b11001010);
+    assert_eq!(out[1], 0b00110101);
+
+    // test reading more bits than available
+    assert!(r.read_bits(&mut out, 33).is_err());
+}
+
+#[test]
+fn test_read_bytes() {
+    let buf = [0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x11, 0x22];
+    let mut r = BitReader::new(&buf);
+
+    let mut out = [0u8; 8];
+
+    // read 4 bytes
+    r.read_bytes(&mut out[0..4]).unwrap();
+    assert_eq!(out[0..4], [0xaa, 0xbb, 0xcc, 0xdd]);
+
+    // read 2 more bytes
+    r.read_bytes(&mut out[0..2]).unwrap();
+    assert_eq!(out[0..2], [0xee, 0xff]);
+
+    // try to read more bytes than available
+    assert!(r.read_bytes(&mut out).is_err());
+
+    // read remaining bytes
+    r.read_bytes(&mut out[0..2]).unwrap();
+    assert_eq!(out[0..2], [0x11, 0x22]);
+
+    // try to read when no more bytes are available
+    assert!(r.read_bytes(&mut out[0..1]).is_err());
+}
