@@ -18,14 +18,14 @@ fn test_varuint64() {
 
     let mut buf = [0u8; 1 << 20];
 
-    let mut w = BitWriter::new(&mut buf);
+    let mut bw = BitWriter::new(&mut buf);
     for x in &values {
-        w.write_uvarint64(*x).unwrap();
+        bw.write_uvarint64(*x).unwrap();
     }
 
-    let mut r = BitReader::new(&buf);
+    let mut br = BitReader::new(&buf);
     for want in &values {
-        let got = r.read_uvarint64().unwrap();
+        let got = br.read_uvarint64().unwrap();
         assert_eq!(got, *want);
     }
 }
@@ -51,14 +51,14 @@ fn test_varint64() {
 
     let mut buf = [0u8; 1 << 20];
 
-    let mut w = BitWriter::new(&mut buf);
+    let mut bw = BitWriter::new(&mut buf);
     for x in &values {
-        w.write_varint64(*x).unwrap();
+        bw.write_varint64(*x).unwrap();
     }
 
-    let mut r = BitReader::new(&buf);
+    let mut br = BitReader::new(&buf);
     for want in &values {
-        let got = r.read_varint64().unwrap();
+        let got = br.read_varint64().unwrap();
         assert_eq!(got, *want);
     }
 }

@@ -16,8 +16,8 @@ fn bench_write_ubit64(c: &mut Criterion<CyclesPerByte>) {
             BenchmarkId::new("write_ubit64", format!("{:?}", input)),
             |b| {
                 b.iter(|| {
-                    let mut w = BitWriter::new(&mut buf);
-                    black_box(w.write_ubit64(input.0, input.1).unwrap());
+                    let mut bw = BitWriter::new(&mut buf);
+                    black_box(bw.write_ubit64(input.0, input.1).unwrap());
                 })
             },
         );
@@ -25,9 +25,9 @@ fn bench_write_ubit64(c: &mut Criterion<CyclesPerByte>) {
 
     group.bench_function("write_ubit64", |b| {
         b.iter(|| {
-            let mut w = BitWriter::new(&mut buf);
-            black_box(w.write_ubit64(0xfffffffffffffff, 60).unwrap());
-            black_box(w.write_ubit64(0xaa, 8).unwrap());
+            let mut bw = BitWriter::new(&mut buf);
+            black_box(bw.write_ubit64(0xfffffffffffffff, 60).unwrap());
+            black_box(bw.write_ubit64(0xaa, 8).unwrap());
         })
     });
 
@@ -44,8 +44,8 @@ fn bench_read_ubit64(c: &mut Criterion<CyclesPerByte>) {
             BenchmarkId::new("read_ubit64_unchecked", format!("{:?}", input)),
             |b| {
                 b.iter(|| unsafe {
-                    let mut r = BitReader::new(&mut buf);
-                    black_box(r.read_ubit64_unchecked(input.1));
+                    let mut br = BitReader::new(&mut buf);
+                    black_box(br.read_ubit64_unchecked(input.1));
                 })
             },
         );
@@ -55,8 +55,8 @@ fn bench_read_ubit64(c: &mut Criterion<CyclesPerByte>) {
             BenchmarkId::new("read_ubit64", format!("{:?}", input)),
             |b| {
                 b.iter(|| {
-                    let mut r = BitReader::new(&mut buf);
-                    black_box(r.read_ubit64(input.1).unwrap());
+                    let mut br = BitReader::new(&mut buf);
+                    black_box(br.read_ubit64(input.1).unwrap());
                 })
             },
         );
@@ -64,16 +64,16 @@ fn bench_read_ubit64(c: &mut Criterion<CyclesPerByte>) {
 
     group.bench_function("read_ubit64_unchecked/<spanning_blocks>", |b| {
         b.iter(|| unsafe {
-            let mut w = BitReader::new(&mut buf);
-            black_box(w.read_ubit64_unchecked(60));
-            black_box(w.read_ubit64_unchecked(8));
+            let mut br = BitReader::new(&mut buf);
+            black_box(br.read_ubit64_unchecked(60));
+            black_box(br.read_ubit64_unchecked(8));
         })
     });
     group.bench_function("read_ubit64/<spanning_blocks>", |b| {
         b.iter(|| {
-            let mut w = BitReader::new(&mut buf);
-            black_box(w.read_ubit64(60).unwrap());
-            black_box(w.read_ubit64(8).unwrap());
+            let mut br = BitReader::new(&mut buf);
+            black_box(br.read_ubit64(60).unwrap());
+            black_box(br.read_ubit64(8).unwrap());
         })
     });
 

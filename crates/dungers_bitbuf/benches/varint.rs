@@ -15,8 +15,8 @@ fn bench_write_uvarint64(c: &mut Criterion<CyclesPerByte>) {
     for &value in U64_VALUES {
         group.bench_function(BenchmarkId::new("write_uvarint64", value), |b| {
             b.iter(|| {
-                let mut w = BitWriter::new(&mut buf);
-                black_box(w.write_uvarint64(value).unwrap());
+                let mut bw = BitWriter::new(&mut buf);
+                black_box(bw.write_uvarint64(value).unwrap());
             })
         });
     }
@@ -30,25 +30,25 @@ fn bench_read_uvarint64(c: &mut Criterion<CyclesPerByte>) {
     let mut buf = vec![0u8; max_varint_size::<u64>()];
 
     for &value in U64_VALUES {
-        let mut w = BitWriter::new(&mut buf);
-        w.write_uvarint64(value).unwrap();
+        let mut bw = BitWriter::new(&mut buf);
+        bw.write_uvarint64(value).unwrap();
 
         group.bench_function(BenchmarkId::new("read_uvarint64_unchecked", value), |b| {
             b.iter(|| unsafe {
-                let mut r = BitReader::new(&buf);
-                black_box(r.read_uvarint64_unchecked());
+                let mut br = BitReader::new(&buf);
+                black_box(br.read_uvarint64_unchecked());
             })
         });
     }
 
     for &value in U64_VALUES {
-        let mut w = BitWriter::new(&mut buf);
-        w.write_uvarint64(value).unwrap();
+        let mut bw = BitWriter::new(&mut buf);
+        bw.write_uvarint64(value).unwrap();
 
         group.bench_function(BenchmarkId::new("read_uvarint64", value), |b| {
             b.iter(|| {
-                let mut r = BitReader::new(&buf);
-                black_box(r.read_uvarint64().unwrap());
+                let mut br = BitReader::new(&buf);
+                black_box(br.read_uvarint64().unwrap());
             })
         });
     }

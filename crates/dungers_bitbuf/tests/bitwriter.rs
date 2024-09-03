@@ -3,42 +3,42 @@ use dungers_bitbuf::BitWriter;
 #[test]
 fn test_write_ubit64_extra_bits_erasure() {
     let mut buf = [0u8; 8];
-    let mut w = BitWriter::new(&mut buf);
+    let mut bw = BitWriter::new(&mut buf);
 
     // write 4 bits, but provide a value with more than 4 bits set
-    w.write_ubit64(0b11111111, 4).unwrap();
+    bw.write_ubit64(0b11111111, 4).unwrap();
     assert_eq!(buf[0], 0b1111);
 }
 
 #[test]
 fn test_write_ubit64_overflow() {
     let mut buf = [0u8; 8];
-    let mut w = BitWriter::new(&mut buf);
+    let mut bw = BitWriter::new(&mut buf);
 
-    assert!(w.write_ubit64(u64::MAX, u64::BITS as usize).is_ok());
-    assert!(w.write_ubit64(0b1, 1).is_err());
+    assert!(bw.write_ubit64(u64::MAX, u64::BITS as usize).is_ok());
+    assert!(bw.write_ubit64(0b1, 1).is_err());
 }
 
 #[test]
 fn test_write_ubit64_multiple_writes() {
     let mut buf = [0u8; 8];
-    let mut w = BitWriter::new(&mut buf);
+    let mut bw = BitWriter::new(&mut buf);
 
-    w.write_ubit64(0b101, 3).unwrap();
-    w.write_ubit64(0b1100, 4).unwrap();
+    bw.write_ubit64(0b101, 3).unwrap();
+    bw.write_ubit64(0b1100, 4).unwrap();
     assert_eq!(buf[0], 0b1100_101);
 }
 
 #[test]
 fn test_write_ubit64_spanning_blocks() {
     let mut buf = [0u8; 16];
-    let mut w = BitWriter::new(&mut buf);
+    let mut bw = BitWriter::new(&mut buf);
 
     // write 60 bits to nearly fill the first block
-    w.write_ubit64(0xfffffffffffffff, 60).unwrap();
+    bw.write_ubit64(0xfffffffffffffff, 60).unwrap();
 
     // write 8 more bits that will span across the first and second block
-    w.write_ubit64(0xaa, 8).unwrap();
+    bw.write_ubit64(0xaa, 8).unwrap();
 
     // check the first block (64 bits)
     let block1 = u64::from_le_bytes(buf[0..8].try_into().unwrap());
