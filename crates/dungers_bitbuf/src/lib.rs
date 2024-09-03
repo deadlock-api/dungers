@@ -1,3 +1,6 @@
+//! this is a partial port of valve's bitbuf. original implementation can be found on github
+//! <https://github.com/ValveSoftware/source-sdk-2013>.
+
 mod bitreader;
 mod bitwriter;
 mod common;

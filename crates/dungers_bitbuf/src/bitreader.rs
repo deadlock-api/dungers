@@ -3,6 +3,9 @@ use dungers_varint::{max_varint_size, zigzag_decode64, CONTINUE_BIT, PAYLOAD_BIT
 
 use crate::{Error, Result, EXTRA_MASKS};
 
+// NOTE(blukai): introduction of "caching" didn't yeild any performance inprovements, in fact quite
+// the opposite happened. numbers were degraded.
+
 pub struct BitReader<'a> {
     data_bits: usize,
     data: &'a [u64],
@@ -12,15 +15,20 @@ pub struct BitReader<'a> {
 impl<'a> BitReader<'a> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
-        // make sure that alignment is correct.
-        debug_assert!(data.len() % 8 == 0);
-
         Self {
             data_bits: data.len() << 3,
-            // SAFETY: transmuting data into a slice of u64s is safe here because BitReader
-            // requires the input data to be 8-byte aligned, which is enforced by the debug_assert
-            // above.
-            data: unsafe { std::mem::transmute(data) },
+            data: unsafe {
+                // SAFETY: it is okay to transmute u8s into u64s here, even if slice of slice does
+                // not contain enough (8 / size_of::<u64>()).
+                //
+                // that is because all "safe" methods carefully keep track of where the reading is
+                // taking place and any out of bound read will result in an error.
+                //
+                // BUT! "unsafe" `unchecked` methods may allow out of bounds reads - that is ub. in
+                // debug builds assertions will yell at you loudly if something is not right, but
+                // those assertions will not be present in release builds.
+                std::mem::transmute::<&[u8], &[u64]>(data)
+            },
             cur_bit: 0,
         }
     }
@@ -87,8 +95,8 @@ impl<'a> BitReader<'a> {
             let mut block2 = *self.data.get_unchecked(block1_idx + 1);
             block2 &= EXTRA_MASKS[extra_bits];
 
-            // no need to mask since we hit the end of the dword.
-            // shift the second dword's part into the high bits.
+            // no need to mask since we hit the end of the block. shift the second block's part
+            // into the high bits.
             ret |= block2 << (num_bits - extra_bits);
         }
 
@@ -100,9 +108,6 @@ impl<'a> BitReader<'a> {
     /// function returns an [`Error::Overflow`] error.
     #[inline]
     pub fn read_ubit64(&mut self, num_bits: usize) -> Result<u64> {
-        // NOTE: this assertion is redundant because read_ubit64_unchecked that is called down
-        // below asserts the same thing, but it makes things tiny bit more straightforwar thus i'd
-        // like to keep it.
         debug_assert!(num_bits <= 64);
 
         if self.num_bits_left() < num_bits {
@@ -127,6 +132,7 @@ impl<'a> BitReader<'a> {
         if self.num_bits_left() < 1 {
             return Err(Error::Overflow);
         }
+
         // SAFETY: check above ensures that we'll not go out of bounds.
         unsafe { Ok(self.read_bool_unchecked()) }
     }
@@ -144,6 +150,7 @@ impl<'a> BitReader<'a> {
     }
 
     pub unsafe fn read_bits_unchecked(&mut self, buf: &mut [u8], num_bits: usize) {
+        debug_assert!(buf.len() << 3 >= num_bits);
         debug_assert!(self.num_bits_left() >= num_bits);
 
         let mut out = buf.as_mut_ptr();
@@ -177,9 +184,14 @@ impl<'a> BitReader<'a> {
     }
 
     pub fn read_bits(&mut self, buf: &mut [u8], num_bits: usize) -> Result<()> {
+        if buf.len() << 3 < num_bits {
+            return Err(Error::BufferTooSmall);
+        }
+
         if self.num_bits_left() < num_bits {
             return Err(Error::Overflow);
         }
+
         // SAFETY: check above ensures that we'll not go out of bounds.
         unsafe { self.read_bits_unchecked(buf, num_bits) };
         Ok(())
