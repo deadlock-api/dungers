@@ -228,11 +228,10 @@ impl<'a> BitReader<'a> {
         let mut value = (byte & 0x7f) as u64;
         for count in 1..=max_varint_size::<u64>() {
             let byte = self.read_byte()?;
+            value |= ((byte & PAYLOAD_BITS) as u64) << (count * 7);
             if (byte & CONTINUE_BIT) == 0 {
-                value |= (byte as u64) << (count * 7);
                 return Ok(value);
             }
-            value |= ((byte & PAYLOAD_BITS) as u64) << (count * 7);
         }
 
         Err(Error::MalformedVarint)
