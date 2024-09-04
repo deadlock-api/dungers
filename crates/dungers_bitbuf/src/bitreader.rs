@@ -1,5 +1,7 @@
 #[cfg(feature = "varint")]
-use dungers_varint::{max_varint_size, zigzag_decode64, CONTINUE_BIT, PAYLOAD_BITS};
+use dungers_varint::{
+    max_varint_size, zigzag_decode32, zigzag_decode64, CONTINUE_BIT, PAYLOAD_BITS,
+};
 
 use crate::{Error, Result, EXTRA_MASKS};
 
@@ -211,41 +213,59 @@ impl<'a> BitReader<'a> {
     // TODO: varint funcs can be faster
 
     #[cfg(feature = "varint")]
-    pub unsafe fn read_uvarint64_unchecked(&mut self) -> u64 {
+    #[inline(always)]
+    unsafe fn read_uvarint_unchecked<T>(&mut self) -> T
+    where
+        T: From<u8> + std::ops::BitOrAssign + std::ops::Shl<usize, Output = T>,
+    {
         let byte = self.read_byte_unchecked();
         if (byte & CONTINUE_BIT) == 0 {
-            return byte as u64;
+            return T::from(byte);
         }
 
-        let mut value = (byte & 0x7f) as u64;
-        for count in 1..=max_varint_size::<u64>() {
+        let mut value = T::from(byte & 0x7f);
+        for count in 1..=max_varint_size::<T>() {
             let byte = self.read_byte_unchecked();
-            value |= ((byte & PAYLOAD_BITS) as u64) << (count * 7);
+            value |= (T::from(byte & PAYLOAD_BITS)) << (count * 7);
             if (byte & CONTINUE_BIT) == 0 {
                 return value;
             }
         }
 
-        panic!("{}", Error::MalformedVarint)
+        unreachable!("{}", Error::MalformedVarint)
     }
 
     #[cfg(feature = "varint")]
-    pub fn read_uvarint64(&mut self) -> Result<u64> {
+    #[inline(always)]
+    fn read_uvarint<T>(&mut self) -> Result<T>
+    where
+        T: From<u8> + std::ops::BitOrAssign + std::ops::Shl<usize, Output = T>,
+    {
         let byte = self.read_byte()?;
         if (byte & CONTINUE_BIT) == 0 {
-            return Ok(byte as u64);
+            return Ok(T::from(byte));
         }
 
-        let mut value = (byte & 0x7f) as u64;
-        for count in 1..=max_varint_size::<u64>() {
+        let mut value = T::from(byte & 0x7f);
+        for count in 1..=max_varint_size::<T>() {
             let byte = self.read_byte()?;
-            value |= ((byte & PAYLOAD_BITS) as u64) << (count * 7);
+            value |= (T::from(byte & PAYLOAD_BITS)) << (count * 7);
             if (byte & CONTINUE_BIT) == 0 {
                 return Ok(value);
             }
         }
 
         Err(Error::MalformedVarint)
+    }
+
+    #[cfg(feature = "varint")]
+    pub unsafe fn read_uvarint64_unchecked(&mut self) -> u64 {
+        self.read_uvarint_unchecked()
+    }
+
+    #[cfg(feature = "varint")]
+    pub fn read_uvarint64(&mut self) -> Result<u64> {
+        self.read_uvarint()
     }
 
     #[cfg(feature = "varint")]
@@ -256,5 +276,25 @@ impl<'a> BitReader<'a> {
     #[cfg(feature = "varint")]
     pub fn read_varint64(&mut self) -> Result<i64> {
         self.read_uvarint64().map(zigzag_decode64)
+    }
+
+    #[cfg(feature = "varint")]
+    pub unsafe fn read_uvarint32_unchecked(&mut self) -> u32 {
+        self.read_uvarint_unchecked()
+    }
+
+    #[cfg(feature = "varint")]
+    pub fn read_uvarint32(&mut self) -> Result<u32> {
+        self.read_uvarint()
+    }
+
+    #[cfg(feature = "varint")]
+    pub unsafe fn read_varint32_unchecked(&mut self) -> i32 {
+        zigzag_decode32(self.read_uvarint32_unchecked())
+    }
+
+    #[cfg(feature = "varint")]
+    pub fn read_varint32(&mut self) -> Result<i32> {
+        self.read_uvarint32().map(zigzag_decode32)
     }
 }

@@ -107,42 +107,47 @@ pub fn write_varint64<W: io::Write>(w: W, value: i64) -> Result<usize> {
     write_uvarint64(w, zigzag_encode64(value))
 }
 
-macro_rules! impl_read_uvarint {
-    ($fn_name:ident, $ty:ty) => {
-        #[inline]
-        pub fn $fn_name<R: io::Read>(rdr: &mut R) -> Result<($ty, usize)> {
-            let mut buf = [0u8; 1];
+#[inline(always)]
+fn read_uvarint<R: io::Read, T>(rdr: &mut R) -> Result<(T, usize)>
+where
+    T: From<u8> + std::ops::BitOrAssign + std::ops::Shl<usize, Output = T>,
+{
+    let mut buf = [0u8; 1];
 
-            // NOTE: small values are more common then large ones, this is a performance win.
-            rdr.read_exact(&mut buf)?;
-            let byte = unsafe { *buf.get_unchecked(0) };
-            if (byte & CONTINUE_BIT) == 0 {
-                return Ok((byte as $ty, 1));
-            }
+    // NOTE: small values are more common then large ones, this is a performance win.
+    rdr.read_exact(&mut buf)?;
+    let byte = unsafe { *buf.get_unchecked(0) };
+    if (byte & CONTINUE_BIT) == 0 {
+        return Ok((T::from(byte), 1));
+    }
 
-            let mut value = (byte & PAYLOAD_BITS) as $ty;
-            for count in 1..max_varint_size::<$ty>() {
-                rdr.read_exact(&mut buf)?;
-                let byte = unsafe { *buf.get_unchecked(0) };
-                value |= ((byte & PAYLOAD_BITS) as $ty) << (count * 7);
-                if (byte & CONTINUE_BIT) == 0 {
-                    return Ok((value, count + 1));
-                }
-            }
-
-            Err(Error::MalformedVarint)
+    let mut value = T::from(byte & PAYLOAD_BITS);
+    for count in 1..max_varint_size::<T>() {
+        rdr.read_exact(&mut buf)?;
+        let byte = unsafe { *buf.get_unchecked(0) };
+        value |= (T::from(byte & PAYLOAD_BITS)) << (count * 7);
+        if (byte & CONTINUE_BIT) == 0 {
+            return Ok((value, count + 1));
         }
-    };
+    }
+
+    Err(Error::MalformedVarint)
 }
 
-impl_read_uvarint!(read_uvarint64, u64);
+#[inline]
+pub fn read_uvarint64<R: io::Read>(rdr: &mut R) -> Result<(u64, usize)> {
+    read_uvarint(rdr)
+}
 
 #[inline]
 pub fn read_varint64<R: io::Read>(rdr: &mut R) -> Result<(i64, usize)> {
     read_uvarint64(rdr).map(|(value, n)| (zigzag_decode64(value), n))
 }
 
-impl_read_uvarint!(read_uvarint32, u32);
+#[inline]
+pub fn read_uvarint32<R: io::Read>(rdr: &mut R) -> Result<(u32, usize)> {
+    read_uvarint(rdr)
+}
 
 #[inline]
 pub fn read_varint32<R: io::Read>(rdr: &mut R) -> Result<(i32, usize)> {
