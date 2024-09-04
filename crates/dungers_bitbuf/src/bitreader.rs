@@ -9,7 +9,7 @@ use crate::{Error, Result, EXTRA_MASKS};
 // the opposite happened. numbers were degraded.
 
 pub struct BitReader<'a> {
-    data_bits: usize,
+    num_bits: usize,
     data: &'a [u64],
     cur_bit: usize,
 }
@@ -18,7 +18,7 @@ impl<'a> BitReader<'a> {
     #[inline]
     pub fn new(data: &'a [u8]) -> Self {
         Self {
-            data_bits: data.len() << 3,
+            num_bits: data.len() << 3,
             data: unsafe {
                 // SAFETY: it is okay to transmute u8s into u64s here, even if slice of slice does
                 // not contain enough (8 / size_of::<u64>()).
@@ -37,7 +37,7 @@ impl<'a> BitReader<'a> {
 
     #[inline(always)]
     pub fn num_bits_left(&self) -> usize {
-        self.data_bits - self.cur_bit
+        self.num_bits - self.cur_bit
     }
 
     #[inline(always)]
@@ -57,7 +57,7 @@ impl<'a> BitReader<'a> {
 
     /// seek to a specific bit.
     pub fn seek(&mut self, bit: usize) -> Result<()> {
-        if bit > self.data_bits {
+        if bit > self.num_bits {
             return Err(Error::Overflow);
         }
         self.cur_bit = bit;
@@ -205,6 +205,13 @@ impl<'a> BitReader<'a> {
 
     pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<()> {
         self.read_bits(buf, buf.len() << 3)
+    }
+
+    /// this can save your ass when you're using `_unchecked` methods. once you're done reading
+    /// from buf call this to see if any bits were read from kyokai no kanata. if this returns true
+    /// that means you are skrewed.
+    pub fn is_overflowed(&self) -> bool {
+        self.cur_bit > self.num_bits
     }
 
     // NOTE: ref impl for varints:
