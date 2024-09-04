@@ -46,6 +46,16 @@ pub fn zigzag_decode64(n: u64) -> i64 {
     (n >> 1) as i64 ^ -((n & 1) as i64)
 }
 
+#[inline(always)]
+pub fn zigzag_encode32(n: i32) -> u32 {
+    ((n << 1) ^ (n >> 31)) as u32
+}
+
+#[inline(always)]
+pub fn zigzag_decode32(n: u32) -> i32 {
+    (n >> 1) as i32 ^ -((n & 1) as i32)
+}
+
 // Each byte in the varint has a continuation bit that indicates if the byte
 // that follows it is part of the varint. This is the most significant bit (MSB)
 // of the byte. The lower 7 bits are a payload; the resulting integer is built
@@ -97,31 +107,44 @@ pub fn write_varint64<W: io::Write>(w: W, value: i64) -> Result<usize> {
     write_uvarint64(w, zigzag_encode64(value))
 }
 
-#[inline]
-pub fn read_uvarint64<R: io::Read>(rdr: &mut R) -> Result<(u64, usize)> {
-    let mut buf = [0u8; 1];
+macro_rules! impl_read_uvarint {
+    ($fn_name:ident, $ty:ty) => {
+        #[inline]
+        pub fn $fn_name<R: io::Read>(rdr: &mut R) -> Result<($ty, usize)> {
+            let mut buf = [0u8; 1];
 
-    // NOTE: small values are more common then large ones, this is a performance win.
-    rdr.read_exact(&mut buf)?;
-    let byte = unsafe { *buf.get_unchecked(0) };
-    if (byte & CONTINUE_BIT) == 0 {
-        return Ok((byte as u64, 1));
-    }
+            // NOTE: small values are more common then large ones, this is a performance win.
+            rdr.read_exact(&mut buf)?;
+            let byte = unsafe { *buf.get_unchecked(0) };
+            if (byte & CONTINUE_BIT) == 0 {
+                return Ok((byte as $ty, 1));
+            }
 
-    let mut value = (byte & PAYLOAD_BITS) as u64;
-    for count in 1..max_varint_size::<u64>() {
-        rdr.read_exact(&mut buf)?;
-        let byte = unsafe { *buf.get_unchecked(0) };
-        value |= ((byte & PAYLOAD_BITS) as u64) << (count * 7);
-        if (byte & CONTINUE_BIT) == 0 {
-            return Ok((value, count + 1));
+            let mut value = (byte & PAYLOAD_BITS) as $ty;
+            for count in 1..max_varint_size::<$ty>() {
+                rdr.read_exact(&mut buf)?;
+                let byte = unsafe { *buf.get_unchecked(0) };
+                value |= ((byte & PAYLOAD_BITS) as $ty) << (count * 7);
+                if (byte & CONTINUE_BIT) == 0 {
+                    return Ok((value, count + 1));
+                }
+            }
+
+            Err(Error::MalformedVarint)
         }
-    }
-
-    Err(Error::MalformedVarint)
+    };
 }
+
+impl_read_uvarint!(read_uvarint64, u64);
 
 #[inline]
 pub fn read_varint64<R: io::Read>(rdr: &mut R) -> Result<(i64, usize)> {
     read_uvarint64(rdr).map(|(value, n)| (zigzag_decode64(value), n))
+}
+
+impl_read_uvarint!(read_uvarint32, u32);
+
+#[inline]
+pub fn read_varint32<R: io::Read>(rdr: &mut R) -> Result<(i32, usize)> {
+    read_uvarint32(rdr).map(|(value, n)| (zigzag_decode32(value), n))
 }
