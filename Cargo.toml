@@ -12,6 +12,7 @@ edition = "2021"
 dungers_bitbuf = { path = "crates/dungers_bitbuf" }
 dungers_charsor = { path = "crates/dungers_charsor" }
 dungers_genvec = { path = "crates/dungers_genvec" }
+dungers_rangealloc = { path = "crates/dungers_rangealloc" }
 dungers_varint = { path = "crates/dungers_varint" }
 # external
 criterion = { version = "0.5.1", features = ["html_reports"] }
@@ -29,10 +30,12 @@ edition.workspace = true
 dungers_bitbuf = { workspace = true, optional = true }
 dungers_charsor = { workspace = true, optional = true }
 dungers_genvec = { workspace = true, optional = true }
+dungers_rangealloc = { workspace = true, optional = true }
 dungers_varint = { workspace = true, optional = true }
 
 [features]
 bitbuf = ["dep:dungers_bitbuf"]
 charsor = ["dep:dungers_charsor"]
 genvec = ["dep:dungers_genvec"]
+rangealloc = ["dep:dungers_rangealloc"]
 varint = ["dep:dungers_varint", "dungers_bitbuf?/varint"]

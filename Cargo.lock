@@ -183,6 +183,7 @@ dependencies = [
  "dungers_bitbuf",
  "dungers_charsor",
  "dungers_genvec",
+ "dungers_rangealloc",
  "dungers_varint",
 ]
 
@@ -207,6 +208,13 @@ dependencies = [
 [[package]]
 name = "dungers_genvec"
 version = "0.0.0"
+
+[[package]]
+name = "dungers_rangealloc"
+version = "0.0.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "dungers_varint"
