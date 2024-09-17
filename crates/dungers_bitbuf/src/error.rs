@@ -8,5 +8,3 @@ pub enum Error {
     #[error("malformed varint")]
     MalformedVarint,
 }
-
-pub type Result<T> = std::result::Result<T, Error>;

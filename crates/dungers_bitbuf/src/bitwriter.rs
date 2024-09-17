@@ -1,7 +1,7 @@
 #[cfg(feature = "varint")]
 use dungers_varint::{zigzag_encode64, CONTINUE_BIT, PAYLOAD_BITS};
 
-use crate::{Error, Result, BIT_WRITE_MASKS, EXTRA_MASKS};
+use crate::{Error, BIT_WRITE_MASKS, EXTRA_MASKS};
 
 pub struct BitWriter<'a> {
     data_bits: usize,
@@ -46,7 +46,7 @@ impl<'a> BitWriter<'a> {
     }
 
     /// seek to a specific bit.
-    pub fn seek(&mut self, bit: usize) -> Result<()> {
+    pub fn seek(&mut self, bit: usize) -> Result<(), Error> {
         if bit > self.data_bits {
             return Err(Error::Overflow);
         }
@@ -55,7 +55,7 @@ impl<'a> BitWriter<'a> {
     }
 
     /// seek to an offset from the current position.
-    pub fn seek_relative(&mut self, bit_delta: isize) -> Result<usize> {
+    pub fn seek_relative(&mut self, bit_delta: isize) -> Result<usize, Error> {
         let bit = self.cur_bit as isize + bit_delta;
         if bit < 0 {
             return Err(Error::Overflow);
@@ -65,7 +65,7 @@ impl<'a> BitWriter<'a> {
     }
 
     #[inline]
-    pub fn write_ubit64(&mut self, data: u64, n: usize) -> Result<()> {
+    pub fn write_ubit64(&mut self, data: u64, n: usize) -> Result<(), Error> {
         // make sure that the requested number of bits to write is in bounds of u64.
         debug_assert!(n <= 64);
 
@@ -105,7 +105,7 @@ impl<'a> BitWriter<'a> {
         Ok(())
     }
 
-    pub fn write_byte(&mut self, data: u8) -> Result<()> {
+    pub fn write_byte(&mut self, data: u8) -> Result<(), Error> {
         self.write_ubit64(data as u64, 8)
     }
 
@@ -115,7 +115,7 @@ impl<'a> BitWriter<'a> {
     // TODO: varint funcs can be faster
 
     #[cfg(feature = "varint")]
-    pub fn write_uvarint64(&mut self, mut value: u64) -> Result<()> {
+    pub fn write_uvarint64(&mut self, mut value: u64) -> Result<(), Error> {
         loop {
             if value < CONTINUE_BIT as u64 {
                 self.write_byte(value as u8)?;
@@ -130,7 +130,7 @@ impl<'a> BitWriter<'a> {
     }
 
     #[cfg(feature = "varint")]
-    pub fn write_varint64(&mut self, data: i64) -> Result<()> {
+    pub fn write_varint64(&mut self, data: i64) -> Result<(), Error> {
         self.write_uvarint64(zigzag_encode64(data))
     }
 }
