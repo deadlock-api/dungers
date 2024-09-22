@@ -5,7 +5,7 @@ pub const PAYLOAD_BITS: u8 = 0x7f;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("io error")]
+    #[error(transparent)]
     Io(#[from] io::Error),
     #[error("malformed varint")]
     MalformedVarint,
