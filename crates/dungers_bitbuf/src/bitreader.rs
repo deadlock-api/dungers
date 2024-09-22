@@ -3,7 +3,9 @@ use dungers_varint::{
     max_varint_size, zigzag_decode32, zigzag_decode64, CONTINUE_BIT, PAYLOAD_BITS,
 };
 
-use crate::{Error, EXTRA_MASKS};
+#[cfg(feature = "varint")]
+use crate::ReadVarintError;
+use crate::{OverflowError, ReadIntoBufferError, EXTRA_MASKS};
 
 // NOTE(blukai): introduction of "caching" didn't yeild any performance inprovements, in fact quite
 // the opposite happened. numbers were degraded.
@@ -56,19 +58,19 @@ impl<'a> BitReader<'a> {
     }
 
     /// seek to a specific bit.
-    pub fn seek(&mut self, bit: usize) -> Result<(), Error> {
+    pub fn seek(&mut self, bit: usize) -> Result<(), OverflowError> {
         if bit > self.num_bits {
-            return Err(Error::Overflow);
+            return Err(OverflowError);
         }
         self.cur_bit = bit;
         Ok(())
     }
 
     /// seek to an offset from the current position.
-    pub fn seek_relative(&mut self, bit_delta: isize) -> Result<usize, Error> {
+    pub fn seek_relative(&mut self, bit_delta: isize) -> Result<usize, OverflowError> {
         let bit = self.cur_bit as isize + bit_delta;
         if bit < 0 {
-            return Err(Error::Overflow);
+            return Err(OverflowError);
         }
         self.seek(bit as usize)?;
         Ok(self.cur_bit)
@@ -109,11 +111,11 @@ impl<'a> BitReader<'a> {
     /// maximum of 64 bits at a time. if the `num_bits` exceeds the number of remaining bits, the
     /// function returns an [`Error::Overflow`] error.
     #[inline]
-    pub fn read_ubit64(&mut self, num_bits: usize) -> Result<u64, Error> {
+    pub fn read_ubit64(&mut self, num_bits: usize) -> Result<u64, OverflowError> {
         debug_assert!(num_bits <= 64);
 
         if self.num_bits_left() < num_bits {
-            return Err(Error::Overflow);
+            return Err(OverflowError);
         }
 
         // SAFETY: assert and check above ensure that we'll not go out of bounds.
@@ -130,9 +132,9 @@ impl<'a> BitReader<'a> {
     }
 
     #[inline]
-    pub fn read_bool(&mut self) -> Result<bool, Error> {
+    pub fn read_bool(&mut self) -> Result<bool, OverflowError> {
         if self.num_bits_left() < 1 {
-            return Err(Error::Overflow);
+            return Err(OverflowError);
         }
 
         // SAFETY: check above ensures that we'll not go out of bounds.
@@ -147,7 +149,7 @@ impl<'a> BitReader<'a> {
     }
 
     #[inline]
-    pub fn read_byte(&mut self) -> Result<u8, Error> {
+    pub fn read_byte(&mut self) -> Result<u8, OverflowError> {
         self.read_ubit64(8).map(|byte| byte as u8)
     }
 
@@ -185,13 +187,17 @@ impl<'a> BitReader<'a> {
         }
     }
 
-    pub fn read_bits(&mut self, buf: &mut [u8], num_bits: usize) -> Result<(), Error> {
+    pub fn read_bits(
+        &mut self,
+        buf: &mut [u8],
+        num_bits: usize,
+    ) -> Result<(), ReadIntoBufferError> {
         if buf.len() << 3 < num_bits {
-            return Err(Error::BufferTooSmall);
+            return Err(ReadIntoBufferError::BufferTooSmall);
         }
 
         if self.num_bits_left() < num_bits {
-            return Err(Error::Overflow);
+            return Err(ReadIntoBufferError::Overflow(OverflowError));
         }
 
         // SAFETY: check above ensures that we'll not go out of bounds.
@@ -203,7 +209,7 @@ impl<'a> BitReader<'a> {
         self.read_bits_unchecked(buf, buf.len() << 3);
     }
 
-    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> Result<(), ReadIntoBufferError> {
         self.read_bits(buf, buf.len() << 3)
     }
 
@@ -215,9 +221,9 @@ impl<'a> BitReader<'a> {
     /// i figured that returning result would be more convenient than a bool because it can be
     /// questionmarked; plus, in some cases, this would eliminate a need of coming up with a custom
     /// error.
-    pub fn is_overflowed(&self) -> Result<(), Error> {
+    pub fn is_overflowed(&self) -> Result<(), OverflowError> {
         if self.cur_bit > self.num_bits {
-            Err(Error::Overflow)
+            Err(OverflowError)
         } else {
             Ok(())
         }
@@ -248,12 +254,12 @@ impl<'a> BitReader<'a> {
             }
         }
 
-        unreachable!("{}", Error::MalformedVarint)
+        unreachable!("{}", ReadVarintError::MalformedVarint)
     }
 
     #[cfg(feature = "varint")]
     #[inline(always)]
-    fn read_uvarint<T>(&mut self) -> Result<T, Error>
+    fn read_uvarint<T>(&mut self) -> Result<T, ReadVarintError>
     where
         T: From<u8> + std::ops::BitOrAssign + std::ops::Shl<usize, Output = T>,
     {
@@ -271,7 +277,7 @@ impl<'a> BitReader<'a> {
             }
         }
 
-        Err(Error::MalformedVarint)
+        Err(ReadVarintError::MalformedVarint)
     }
 
     #[cfg(feature = "varint")]
@@ -280,7 +286,7 @@ impl<'a> BitReader<'a> {
     }
 
     #[cfg(feature = "varint")]
-    pub fn read_uvarint64(&mut self) -> Result<u64, Error> {
+    pub fn read_uvarint64(&mut self) -> Result<u64, ReadVarintError> {
         self.read_uvarint()
     }
 
@@ -290,7 +296,7 @@ impl<'a> BitReader<'a> {
     }
 
     #[cfg(feature = "varint")]
-    pub fn read_varint64(&mut self) -> Result<i64, Error> {
+    pub fn read_varint64(&mut self) -> Result<i64, ReadVarintError> {
         self.read_uvarint64().map(zigzag_decode64)
     }
 
@@ -300,7 +306,7 @@ impl<'a> BitReader<'a> {
     }
 
     #[cfg(feature = "varint")]
-    pub fn read_uvarint32(&mut self) -> Result<u32, Error> {
+    pub fn read_uvarint32(&mut self) -> Result<u32, ReadVarintError> {
         self.read_uvarint()
     }
 
@@ -310,7 +316,7 @@ impl<'a> BitReader<'a> {
     }
 
     #[cfg(feature = "varint")]
-    pub fn read_varint32(&mut self) -> Result<i32, Error> {
+    pub fn read_varint32(&mut self) -> Result<i32, ReadVarintError> {
         self.read_uvarint32().map(zigzag_decode32)
     }
 }

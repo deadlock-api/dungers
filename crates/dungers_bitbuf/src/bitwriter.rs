@@ -1,7 +1,7 @@
 #[cfg(feature = "varint")]
 use dungers_varint::{zigzag_encode64, CONTINUE_BIT, PAYLOAD_BITS};
 
-use crate::{Error, BIT_WRITE_MASKS, EXTRA_MASKS};
+use crate::{OverflowError, BIT_WRITE_MASKS, EXTRA_MASKS};
 
 pub struct BitWriter<'a> {
     data_bits: usize,
@@ -46,31 +46,31 @@ impl<'a> BitWriter<'a> {
     }
 
     /// seek to a specific bit.
-    pub fn seek(&mut self, bit: usize) -> Result<(), Error> {
+    pub fn seek(&mut self, bit: usize) -> Result<(), OverflowError> {
         if bit > self.data_bits {
-            return Err(Error::Overflow);
+            return Err(OverflowError);
         }
         self.cur_bit = bit;
         Ok(())
     }
 
     /// seek to an offset from the current position.
-    pub fn seek_relative(&mut self, bit_delta: isize) -> Result<usize, Error> {
+    pub fn seek_relative(&mut self, bit_delta: isize) -> Result<usize, OverflowError> {
         let bit = self.cur_bit as isize + bit_delta;
         if bit < 0 {
-            return Err(Error::Overflow);
+            return Err(OverflowError);
         }
         self.seek(bit as usize)?;
         Ok(self.cur_bit)
     }
 
     #[inline]
-    pub fn write_ubit64(&mut self, data: u64, n: usize) -> Result<(), Error> {
+    pub fn write_ubit64(&mut self, data: u64, n: usize) -> Result<(), OverflowError> {
         // make sure that the requested number of bits to write is in bounds of u64.
         debug_assert!(n <= 64);
 
         if self.cur_bit + n > self.data_bits {
-            return Err(Error::Overflow);
+            return Err(OverflowError);
         }
 
         // erase bits at n and higher positions
@@ -105,7 +105,7 @@ impl<'a> BitWriter<'a> {
         Ok(())
     }
 
-    pub fn write_byte(&mut self, data: u8) -> Result<(), Error> {
+    pub fn write_byte(&mut self, data: u8) -> Result<(), OverflowError> {
         self.write_ubit64(data as u64, 8)
     }
 
@@ -115,7 +115,7 @@ impl<'a> BitWriter<'a> {
     // TODO: varint funcs can be faster
 
     #[cfg(feature = "varint")]
-    pub fn write_uvarint64(&mut self, mut value: u64) -> Result<(), Error> {
+    pub fn write_uvarint64(&mut self, mut value: u64) -> Result<(), OverflowError> {
         loop {
             if value < CONTINUE_BIT as u64 {
                 self.write_byte(value as u8)?;
@@ -130,7 +130,7 @@ impl<'a> BitWriter<'a> {
     }
 
     #[cfg(feature = "varint")]
-    pub fn write_varint64(&mut self, data: i64) -> Result<(), Error> {
+    pub fn write_varint64(&mut self, data: i64) -> Result<(), OverflowError> {
         self.write_uvarint64(zigzag_encode64(data))
     }
 }
