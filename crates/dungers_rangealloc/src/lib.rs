@@ -113,12 +113,14 @@ where
         range.start..range.start + len
     }
 
+    #[inline]
     pub fn allocate(&mut self, len: T) -> Result<Range<T>, RangeAllocError> {
         self.find_best_fit(len)
             .map(|best_fit| self.allocate_best_fit(len, best_fit))
             .ok_or(RangeAllocError)
     }
 
+    #[inline(always)]
     fn defragment_free_ranges(&mut self) {
         // merge ranges (with range 10..20)
         // free ranges = [5..10, 20..96]
