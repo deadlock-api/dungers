@@ -350,12 +350,6 @@ impl<T> GenVec<T> {
     }
 
     #[inline]
-    fn get_entry_by_index(&self, index: u32) -> &Entry<T> {
-        self.try_get_entry_by_index(index)
-            .unwrap_or_else(|| panic!("could not get entry at index {}", index))
-    }
-
-    #[inline]
     fn try_get_entry_by_index_mut(&mut self, index: u32) -> Option<&mut Entry<T>> {
         self.entries.get_mut(index as usize)
     }
@@ -374,12 +368,6 @@ impl<T> GenVec<T> {
             }
         }
         None
-    }
-
-    #[inline]
-    fn get_entry_by_handle(&self, handle: Handle<T>) -> &Entry<T> {
-        self.try_get_entry_by_handle(handle)
-            .unwrap_or_else(|| panic!("could not get entry at handle {:?}", handle))
     }
 
     #[inline]
