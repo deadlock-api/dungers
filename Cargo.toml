@@ -16,7 +16,7 @@ dungers_ntree = { path = "crates/dungers_ntree" }
 dungers_rangealloc = { path = "crates/dungers_rangealloc" }
 dungers_varint = { path = "crates/dungers_varint" }
 # external
-criterion = { version = "0.5.1", features = ["html_reports"] }
+criterion = { version = "0.6.0", features = ["html_reports"] }
 criterion-cycles-per-byte = "0.6.1"
 
 [package]
