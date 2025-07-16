@@ -26,7 +26,7 @@ fn test_write_ubit64_multiple_writes() {
 
     bw.write_ubit64(0b101, 3).unwrap();
     bw.write_ubit64(0b1100, 4).unwrap();
-    assert_eq!(buf[0], 0b1100_101);
+    assert_eq!(buf[0], 0b110_0101);
 }
 
 #[test]

@@ -17,7 +17,7 @@ pub const fn get_bit_for_bit_num(bit_num: usize) -> u64 {
 
 // tier1/bitbuf.cpp
 // uint32 g_BitWriteMasks[32][33];
-pub(crate) const BIT_WRITE_MASKS: [[u64; 65]; 64] = {
+pub(crate) static BIT_WRITE_MASKS: [[u64; 65]; 64] = {
     let mut bit_write_masks = [[0; 65]; 64];
     let mut start_bit = 0;
     while start_bit < 64 {

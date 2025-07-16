@@ -12,6 +12,7 @@ dungers_bitbuf = { path = "crates/dungers_bitbuf" }
 dungers_charsor = { path = "crates/dungers_charsor" }
 dungers_varint = { path = "crates/dungers_varint" }
 thiserror = "2.0.12"
+bytemuck = "1.23.1"
 
 [package]
 name = "dungers"

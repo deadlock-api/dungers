@@ -9,12 +9,12 @@ fn test_varuint64() {
     // "random" numbers.
     let mut values = Vec::new();
 
-    let increment = (1 as u64) << (u64::BITS - 8);
+    let increment = 1 << (u64::BITS - 8);
     values.extend((0..256).map(|i| u64::MIN + i * increment));
 
     values.push(u64::MAX);
 
-    values.extend((-500..500).map(|i| (i as u64).wrapping_mul(0x12345789abcdefu64 as u64)));
+    values.extend((-500..500).map(|i| (i as u64).wrapping_mul(0x12345789abcdefu64)));
 
     let mut buf = [0u8; 1 << 20];
 
@@ -25,7 +25,7 @@ fn test_varuint64() {
 
     let mut br = BitReader::new(&buf);
     for want in &values {
-        let got = br.read_uvarint64().unwrap();
+        let got: u64 = br.read_uvarint().unwrap();
         assert_eq!(got, *want);
     }
 }
@@ -37,7 +37,7 @@ fn test_varint64() {
     let mut values = Vec::new();
 
     let mut value = i64::MIN;
-    let increment = (1 as i64) << (i64::BITS - 8);
+    let increment = 1 << (i64::BITS - 8);
 
     for _ in 0..256 {
         values.push(value);
@@ -47,7 +47,7 @@ fn test_varint64() {
 
     values.push(i64::MAX);
 
-    values.extend((-500..500).map(|i| (i as i64).wrapping_mul(0x12345789abcdefi64 as i64)));
+    values.extend((-500..500).map(|i| (i as i64).wrapping_mul(0x12345789abcdefi64)));
 
     let mut buf = [0u8; 1 << 20];
 

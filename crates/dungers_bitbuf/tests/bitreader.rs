@@ -12,7 +12,7 @@ fn test_read_ubit64_overflow() {
 #[test]
 fn test_read_ubit64_multiple_reads() {
     let mut buf = [0u8; 8];
-    buf[0] = 0b1100_101;
+    buf[0] = 0b110_0101;
     let mut br = BitReader::new(&buf);
 
     assert_eq!(br.read_ubit64(3).unwrap(), 0b101);
