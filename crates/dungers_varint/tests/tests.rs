@@ -11,12 +11,12 @@ pub fn test_uvarint64() {
     // numbers.
     let mut values = Vec::new();
 
-    let increment = (1 as u64) << (u64::BITS - 8);
+    let increment = 1 << (u64::BITS - 8);
     values.extend((0..256).map(|i| u64::MIN + i * increment));
 
     values.push(u64::MAX);
 
-    values.extend((-500..500).map(|i| (i as u64).wrapping_mul(0x12345789ABCDEFu64 as u64)));
+    values.extend((-500..500).map(|i| (i as u64).wrapping_mul(0x12345789ABCDEFu64)));
 
     let mut buf = [0u8; 1 << 20];
     let mut cursor = io::Cursor::new(&mut buf[..]);
@@ -41,7 +41,7 @@ pub fn test_varint64() {
     let mut values = Vec::new();
 
     let mut value = i64::MIN;
-    let increment = (1 as i64) << (i64::BITS - 8);
+    let increment = 1 << (i64::BITS - 8);
 
     for _ in 0..256 {
         values.push(value);
@@ -51,7 +51,7 @@ pub fn test_varint64() {
 
     values.push(i64::MAX);
 
-    values.extend((-500..500).map(|i| (i as i64).wrapping_mul(0x12345789ABCDEFi64 as i64)));
+    values.extend((-500..500).map(|i| (i as i64).wrapping_mul(0x12345789ABCDEFi64)));
 
     let mut buf = [0u8; 1 << 20];
     let mut cursor = io::Cursor::new(&mut buf[..]);

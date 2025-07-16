@@ -1,6 +1,18 @@
+#![forbid(unsafe_code)]
+#![deny(clippy::all)]
+#![deny(unreachable_pub)]
+#![deny(clippy::correctness)]
+#![deny(clippy::suspicious)]
+#![deny(clippy::style)]
+#![deny(clippy::complexity)]
+#![deny(clippy::perf)]
+#![deny(clippy::pedantic)]
+#![deny(clippy::std_instead_of_core)]
+#![allow(clippy::should_implement_trait)]
+
 use core::ops::Range;
 
-/// enhanced version of [std::str::Chars].
+/// enhanced version of [`std::str::Chars`].
 #[derive(Debug, Clone)]
 pub struct Charsor<'a> {
     input: &'a str,
@@ -9,6 +21,7 @@ pub struct Charsor<'a> {
 }
 
 impl<'a> Charsor<'a> {
+    #[must_use]
     pub fn new(input: &'a str) -> Self {
         Self { input, offset: 0 }
     }
@@ -24,9 +37,8 @@ impl<'a> Charsor<'a> {
     #[must_use]
     #[inline]
     pub fn next(&mut self) -> Option<char> {
-        self.peek().map(|ch| {
+        self.peek().inspect(|ch| {
             self.offset += ch.len_utf8();
-            ch
         })
     }
 
@@ -37,7 +49,7 @@ impl<'a> Charsor<'a> {
         self.input[..self.offset].chars().next_back()
     }
 
-    /// eat_while advances the offset and skips over chars while the given closure returns true.
+    /// `eat_while` advances the offset and skips over chars while the given closure returns true.
     /// returns the number of chars skipped.
     pub fn eat_while(&mut self, func: impl Fn(char) -> bool) -> usize {
         let mut n = 0;
@@ -63,7 +75,7 @@ impl<'a> Charsor<'a> {
     #[must_use]
     #[inline]
     pub fn prev_offset(&self) -> usize {
-        self.offset - self.prev().map_or(0, |ch| ch.len_utf8())
+        self.offset - self.prev().map_or(0, char::len_utf8)
     }
 
     /// returns a slice of the input str at the specified byte range. panics if the range extends
@@ -92,7 +104,7 @@ mod tests {
     #[test]
     fn test_next() {
         let mut cc = Charsor::new(INPUT);
-        for ch in INPUT_CHARS.iter().cloned() {
+        for ch in INPUT_CHARS.iter().copied() {
             assert_eq!(cc.next(), Some(ch));
         }
     }
@@ -110,7 +122,7 @@ mod tests {
         const PREFIX: &str = "    ";
         let input = format!("{PREFIX}{INPUT}");
         let mut cc = Charsor::new(&input);
-        cc.eat_while(|ch| ch.is_whitespace());
+        cc.eat_while(char::is_whitespace);
         assert_eq!(cc.offset(), PREFIX.len());
     }
 
