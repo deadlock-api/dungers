@@ -10,7 +10,6 @@ pub struct BitWriter<'a> {
 }
 
 impl<'a> BitWriter<'a> {
-    #[inline]
     pub fn new(buf: &'a mut [u8]) -> Self {
         Self {
             data_bits: buf.len() << 3,
@@ -19,22 +18,22 @@ impl<'a> BitWriter<'a> {
         }
     }
 
-    #[inline(always)]
+    #[must_use]
     pub fn num_bits_left(&self) -> usize {
         self.data_bits - self.cur_bit
     }
 
-    #[inline(always)]
+    #[must_use]
     pub fn num_bytes_left(&self) -> usize {
         self.num_bits_left() >> 3
     }
 
-    #[inline(always)]
+    #[must_use]
     pub fn num_bits_written(&self) -> usize {
         self.cur_bit
     }
 
-    #[inline(always)]
+    #[must_use]
     pub fn num_bytes_written(&self) -> usize {
         (self.cur_bit + 7) >> 3
     }

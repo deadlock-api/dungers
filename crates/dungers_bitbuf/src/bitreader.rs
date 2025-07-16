@@ -15,7 +15,7 @@ pub struct BitReader<'a> {
 }
 
 impl<'a> BitReader<'a> {
-    #[inline]
+    #[must_use]
     pub fn new(data: &'a [u8]) -> Self {
         Self {
             num_bits: data.len() << 3,
@@ -36,22 +36,22 @@ impl<'a> BitReader<'a> {
         }
     }
 
-    #[inline(always)]
+    #[must_use]
     pub fn num_bits_left(&self) -> usize {
         self.num_bits - self.cur_bit
     }
 
-    #[inline(always)]
+    #[must_use]
     pub fn num_bytes_left(&self) -> usize {
         self.num_bits_left() >> 3
     }
 
-    #[inline(always)]
+    #[must_use]
     pub fn num_bits_read(&self) -> usize {
         self.cur_bit
     }
 
-    #[inline(always)]
+    #[must_use]
     pub fn num_bytes_read(&self) -> usize {
         (self.cur_bit + 7) >> 3
     }

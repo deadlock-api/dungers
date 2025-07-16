@@ -10,7 +10,7 @@ pub(crate) const BITS_FOR_BIT_NUM: [u64; 64] = {
     bits_for_bit_num
 };
 
-#[inline(always)]
+#[must_use]
 pub const fn get_bit_for_bit_num(bit_num: usize) -> u64 {
     BITS_FOR_BIT_NUM[bit_num & 63]
 }

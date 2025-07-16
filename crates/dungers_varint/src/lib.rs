@@ -48,26 +48,20 @@ pub enum VarintError {
 //
 //        >> encode >>
 //        << decode <<
-
-#[inline]
 #[must_use]
 pub fn zigzag_encode64(n: i64) -> u64 {
     ((n << 1) ^ (n >> 63)) as u64
 }
-
-#[inline]
 #[must_use]
 pub fn zigzag_decode64(n: u64) -> i64 {
     (n >> 1) as i64 ^ -((n & 1) as i64)
 }
 
-#[inline]
 #[must_use]
 pub fn zigzag_encode32(n: i32) -> u32 {
     ((n << 1) ^ (n >> 31)) as u32
 }
 
-#[inline]
 #[must_use]
 pub fn zigzag_decode32(n: u32) -> i32 {
     (n >> 1) as i32 ^ -((n & 1) as i32)
@@ -94,7 +88,6 @@ pub const fn max_varint_size<T>() -> usize {
     (size_of::<T>() * 8).div_ceil(7)
 }
 
-#[inline]
 pub fn write_uvarint64<W: io::Write>(mut w: W, mut value: u64) -> Result<usize, VarintError> {
     let mut buf = [0u8; max_varint_size::<u64>()];
     let mut count = 0;
@@ -116,12 +109,10 @@ pub fn write_uvarint64<W: io::Write>(mut w: W, mut value: u64) -> Result<usize, 
     Ok(count)
 }
 
-#[inline]
 pub fn write_varint64<W: io::Write>(w: W, value: i64) -> Result<usize, VarintError> {
     write_uvarint64(w, zigzag_encode64(value))
 }
 
-#[inline]
 fn read_uvarint<R: io::Read, T>(rdr: &mut R) -> Result<(T, usize), VarintError>
 where
     T: From<u8> + core::ops::BitOrAssign + core::ops::Shl<usize, Output = T>,
@@ -148,22 +139,18 @@ where
     Err(VarintError::MalformedVarint)
 }
 
-#[inline]
 pub fn read_uvarint64<R: io::Read>(rdr: &mut R) -> Result<(u64, usize), VarintError> {
     read_uvarint(rdr)
 }
 
-#[inline]
 pub fn read_varint64<R: io::Read>(rdr: &mut R) -> Result<(i64, usize), VarintError> {
     read_uvarint64(rdr).map(|(value, n)| (zigzag_decode64(value), n))
 }
 
-#[inline]
 pub fn read_uvarint32<R: io::Read>(rdr: &mut R) -> Result<(u32, usize), VarintError> {
     read_uvarint(rdr)
 }
 
-#[inline]
 pub fn read_varint32<R: io::Read>(rdr: &mut R) -> Result<(i32, usize), VarintError> {
     read_uvarint32(rdr).map(|(value, n)| (zigzag_decode32(value), n))
 }

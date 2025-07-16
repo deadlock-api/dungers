@@ -28,14 +28,11 @@ impl<'a> Charsor<'a> {
 
     /// peek returns but does not consume the next char in the input.
     #[must_use]
-    #[inline]
     pub fn peek(&self) -> Option<char> {
         self.input[self.offset..].chars().next()
     }
 
     /// next advances the offset and returns the next char.
-    #[must_use]
-    #[inline]
     pub fn next(&mut self) -> Option<char> {
         self.peek().inspect(|ch| {
             self.offset += ch.len_utf8();
@@ -44,7 +41,6 @@ impl<'a> Charsor<'a> {
 
     /// prev returns the previous char in the input, without modifying the offset.
     #[must_use]
-    #[inline]
     pub fn prev(&self) -> Option<char> {
         self.input[..self.offset].chars().next_back()
     }
@@ -66,14 +62,11 @@ impl<'a> Charsor<'a> {
     /// returns the byte position of the next char, relative to the beginning of the input, or the
     /// length of the underlying str if there are no more characters.
     #[must_use]
-    #[inline]
     pub fn offset(&self) -> usize {
         self.offset
     }
 
     /// returns the byte position of the prev char, relative to the beginning of the input.
-    #[must_use]
-    #[inline]
     pub fn prev_offset(&self) -> usize {
         self.offset - self.prev().map_or(0, char::len_utf8)
     }
@@ -81,7 +74,6 @@ impl<'a> Charsor<'a> {
     /// returns a slice of the input str at the specified byte range. panics if the range extends
     /// beyond the length of the input str.
     #[must_use]
-    #[inline]
     pub fn slice_range(&self, range: Range<usize>) -> &'a str {
         &self.input[range]
     }
