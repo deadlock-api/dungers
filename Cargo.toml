@@ -5,13 +5,13 @@ members = [
 ]
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 
 [workspace.dependencies]
 dungers_bitbuf = { path = "crates/dungers_bitbuf" }
 dungers_charsor = { path = "crates/dungers_charsor" }
 dungers_varint = { path = "crates/dungers_varint" }
-thiserror = "1.0.63"
+thiserror = "2.0.12"
 
 [package]
 name = "dungers"
