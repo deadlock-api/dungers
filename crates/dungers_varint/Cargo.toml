@@ -5,11 +5,3 @@ edition.workspace = true
 
 [dependencies]
 thiserror.workspace = true
-
-[dev-dependencies]
-criterion.workspace = true
-criterion-cycles-per-byte.workspace = true
-
-[[bench]]
-name = "main"
-harness = false
